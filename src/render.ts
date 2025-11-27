@@ -97,12 +97,20 @@ function drawHUD(
   ctx.textBaseline = 'top';
   ctx.fillText(`Tick: ${state.tick}`, 10, 10);
 
-  // Count active players per team
-  const teamACounts = state.players.filter(p => p.id.team === 'A' && p.active).length;
-  const teamBCounts = state.players.filter(p => p.id.team === 'B' && p.active).length;
+  // Count active players per team in a single pass
+  const teamCounts = state.players.reduce(
+    (counts, p) => {
+      if (p.active) {
+        if (p.id.team === 'A') counts.a++;
+        else counts.b++;
+      }
+      return counts;
+    },
+    { a: 0, b: 0 }
+  );
 
   ctx.textAlign = 'right';
-  ctx.fillText(`Team A: ${teamACounts}/6  |  Team B: ${teamBCounts}/6`, ARENA_WIDTH - 10, 10);
+  ctx.fillText(`Team A: ${teamCounts.a}/6  |  Team B: ${teamCounts.b}/6`, ARENA_WIDTH - 10, 10);
 
   // Draw local team indicator
   if (localTeam) {

@@ -17,8 +17,16 @@ import {
 /** Deadzone for analog sticks */
 const STICK_DEADZONE = 0.25;
 
+/** Standard gamepad button indices (based on W3C Gamepad API) */
+const GAMEPAD_BUTTON = {
+  DPAD_UP: 12,
+  DPAD_DOWN: 13,
+  DPAD_LEFT: 14,
+  DPAD_RIGHT: 15,
+};
+
 /** Keyboard mappings for the first player (keyboard player) */
-const KEYBOARD_MAPPINGS = {
+export const KEYBOARD_MAPPINGS = {
   up: ['KeyW', 'ArrowUp'],
   down: ['KeyS', 'ArrowDown'],
   left: ['KeyA', 'ArrowLeft'],
@@ -48,9 +56,22 @@ export class InputManager {
   private assignments: LocalSlotAssignment[] = [];
   private gamepadLastButtonState: Map<number, boolean[]> = new Map();
   private onPlayerJoined?: (slot: PlayerSlotIndex) => void;
+  
+  // Store event listener references for cleanup
+  private keydownHandler: (e: KeyboardEvent) => void;
+  private keyupHandler: (e: KeyboardEvent) => void;
+  private gamepadConnectedHandler: (e: GamepadEvent) => void;
+  private gamepadDisconnectedHandler: (e: GamepadEvent) => void;
 
   constructor(team: TeamId) {
     this.localTeam = team;
+    
+    // Create bound handlers for proper cleanup
+    this.keydownHandler = this.handleKeydown.bind(this);
+    this.keyupHandler = this.handleKeyup.bind(this);
+    this.gamepadConnectedHandler = this.handleGamepadConnected.bind(this);
+    this.gamepadDisconnectedHandler = this.handleGamepadDisconnected.bind(this);
+    
     this.setupKeyboardListeners();
     this.setupGamepadListeners();
   }
@@ -77,44 +98,62 @@ export class InputManager {
   }
 
   /**
+   * Handles keydown events
+   */
+  private handleKeydown(e: KeyboardEvent): void {
+    pressedKeys.add(e.code);
+    
+    // Check if keyboard player should join
+    const isMovementKey = [
+      ...KEYBOARD_MAPPINGS.up,
+      ...KEYBOARD_MAPPINGS.down,
+      ...KEYBOARD_MAPPINGS.left,
+      ...KEYBOARD_MAPPINGS.right,
+    ].includes(e.code);
+
+    if (isMovementKey && !this.hasKeyboardAssignment()) {
+      this.assignKeyboard();
+    }
+  }
+
+  /**
+   * Handles keyup events
+   */
+  private handleKeyup(e: KeyboardEvent): void {
+    pressedKeys.delete(e.code);
+  }
+
+  /**
+   * Handles gamepad connected events
+   */
+  private handleGamepadConnected(e: GamepadEvent): void {
+    console.log(`Gamepad connected: ${e.gamepad.id} (index: ${e.gamepad.index})`);
+    this.gamepadLastButtonState.set(e.gamepad.index, []);
+  }
+
+  /**
+   * Handles gamepad disconnected events
+   */
+  private handleGamepadDisconnected(e: GamepadEvent): void {
+    console.log(`Gamepad disconnected: ${e.gamepad.id} (index: ${e.gamepad.index})`);
+    this.removeGamepadAssignment(e.gamepad.index);
+    this.gamepadLastButtonState.delete(e.gamepad.index);
+  }
+
+  /**
    * Sets up keyboard event listeners
    */
-  private setupKeyboardListeners() {
-    window.addEventListener('keydown', (e) => {
-      pressedKeys.add(e.code);
-      
-      // Check if keyboard player should join
-      const isMovementKey = [
-        ...KEYBOARD_MAPPINGS.up,
-        ...KEYBOARD_MAPPINGS.down,
-        ...KEYBOARD_MAPPINGS.left,
-        ...KEYBOARD_MAPPINGS.right,
-      ].includes(e.code);
-
-      if (isMovementKey && !this.hasKeyboardAssignment()) {
-        this.assignKeyboard();
-      }
-    });
-
-    window.addEventListener('keyup', (e) => {
-      pressedKeys.delete(e.code);
-    });
+  private setupKeyboardListeners(): void {
+    window.addEventListener('keydown', this.keydownHandler);
+    window.addEventListener('keyup', this.keyupHandler);
   }
 
   /**
    * Sets up gamepad connection listeners
    */
-  private setupGamepadListeners() {
-    window.addEventListener('gamepadconnected', (e) => {
-      console.log(`Gamepad connected: ${e.gamepad.id} (index: ${e.gamepad.index})`);
-      this.gamepadLastButtonState.set(e.gamepad.index, []);
-    });
-
-    window.addEventListener('gamepaddisconnected', (e) => {
-      console.log(`Gamepad disconnected: ${e.gamepad.id} (index: ${e.gamepad.index})`);
-      this.removeGamepadAssignment(e.gamepad.index);
-      this.gamepadLastButtonState.delete(e.gamepad.index);
-    });
+  private setupGamepadListeners(): void {
+    window.addEventListener('gamepadconnected', this.gamepadConnectedHandler);
+    window.addEventListener('gamepaddisconnected', this.gamepadDisconnectedHandler);
   }
 
   /**
@@ -226,11 +265,11 @@ export class InputManager {
     const lx = gamepad.axes[0] ?? 0;
     const ly = gamepad.axes[1] ?? 0;
 
-    // Read D-pad (buttons 12-15 are typically up/down/left/right)
-    const dpadUp = gamepad.buttons[12]?.pressed ?? false;
-    const dpadDown = gamepad.buttons[13]?.pressed ?? false;
-    const dpadLeft = gamepad.buttons[14]?.pressed ?? false;
-    const dpadRight = gamepad.buttons[15]?.pressed ?? false;
+    // Read D-pad buttons
+    const dpadUp = gamepad.buttons[GAMEPAD_BUTTON.DPAD_UP]?.pressed ?? false;
+    const dpadDown = gamepad.buttons[GAMEPAD_BUTTON.DPAD_DOWN]?.pressed ?? false;
+    const dpadLeft = gamepad.buttons[GAMEPAD_BUTTON.DPAD_LEFT]?.pressed ?? false;
+    const dpadRight = gamepad.buttons[GAMEPAD_BUTTON.DPAD_RIGHT]?.pressed ?? false;
 
     return {
       up: ly < -STICK_DEADZONE || dpadUp,
@@ -306,9 +345,13 @@ export class InputManager {
   /**
    * Destroys the input manager and cleans up listeners
    */
-  destroy() {
-    // Note: We don't remove the keyboard listeners as they're added anonymously
-    // In a production app, we'd store references and remove them
+  destroy(): void {
+    // Remove all event listeners
+    window.removeEventListener('keydown', this.keydownHandler);
+    window.removeEventListener('keyup', this.keyupHandler);
+    window.removeEventListener('gamepadconnected', this.gamepadConnectedHandler);
+    window.removeEventListener('gamepaddisconnected', this.gamepadDisconnectedHandler);
+    
     this.assignments = [];
     this.gamepadLastButtonState.clear();
   }

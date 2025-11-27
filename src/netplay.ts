@@ -22,6 +22,15 @@ import { TeamId, PlayerSlotIndex, MAX_PLAYERS_PER_TEAM, playerIdToKey, PlayerCom
 import { createInitialState, simulateStep, activatePlayer, ARENA_WIDTH, ARENA_HEIGHT, serializeState } from './simulation';
 import type { GameState } from './gameState';
 import { render } from './render';
+import { KEYBOARD_MAPPINGS } from './input';
+
+/** All movement key codes for detecting join intent */
+const ALL_MOVEMENT_KEYS = [
+  ...KEYBOARD_MAPPINGS.up,
+  ...KEYBOARD_MAPPINGS.down,
+  ...KEYBOARD_MAPPINGS.left,
+  ...KEYBOARD_MAPPINGS.right,
+];
 
 /**
  * Holiday Wars Game class for NetplayJS
@@ -69,8 +78,7 @@ export class HolidayWarsGame extends Game {
       const keysHeld = input.keysHeld;
 
       // Check if this player is trying to join (any movement key pressed)
-      const wantsToJoin = keysHeld['KeyW'] || keysHeld['KeyS'] || keysHeld['KeyA'] || keysHeld['KeyD'] ||
-                         keysHeld['ArrowUp'] || keysHeld['ArrowDown'] || keysHeld['ArrowLeft'] || keysHeld['ArrowRight'];
+      const wantsToJoin = ALL_MOVEMENT_KEYS.some(key => keysHeld[key]);
 
       // Find the first unactive slot for this player
       if (wantsToJoin) {
@@ -100,10 +108,10 @@ export class HolidayWarsGame extends Game {
         if (this.activeSlots[playerIndex][slot]) {
           const key = playerIdToKey({ team, slot: slot as PlayerSlotIndex });
           const command: PlayerCommand = {
-            up: keysHeld['KeyW'] || keysHeld['ArrowUp'] || false,
-            down: keysHeld['KeyS'] || keysHeld['ArrowDown'] || false,
-            left: keysHeld['KeyA'] || keysHeld['ArrowLeft'] || false,
-            right: keysHeld['KeyD'] || keysHeld['ArrowRight'] || false,
+            up: KEYBOARD_MAPPINGS.up.some(k => keysHeld[k]),
+            down: KEYBOARD_MAPPINGS.down.some(k => keysHeld[k]),
+            left: KEYBOARD_MAPPINGS.left.some(k => keysHeld[k]),
+            right: KEYBOARD_MAPPINGS.right.some(k => keysHeld[k]),
           };
           commands.set(key, command);
           break; // Only first active slot uses keyboard for now

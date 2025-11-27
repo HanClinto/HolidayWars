@@ -72,6 +72,11 @@ export function createInitialState(): GameState {
   };
 }
 
+/** Spawn position spacing */
+const SPAWN_COLUMN_SPACING = 60;
+const SPAWN_ROW_SPACING = 120;
+const SPAWN_START_Y = 150;
+
 /**
  * Gets spawn position for a player based on team and slot
  */
@@ -81,8 +86,8 @@ export function getSpawnPosition(team: TeamId, slot: PlayerSlotIndex): { x: numb
   const col = slot % 3;
   
   return {
-    x: baseX + col * 60,
-    y: 150 + row * 120,
+    x: baseX + col * SPAWN_COLUMN_SPACING,
+    y: SPAWN_START_Y + row * SPAWN_ROW_SPACING,
   };
 }
 
